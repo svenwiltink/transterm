@@ -21,6 +21,7 @@ type Application struct {
 	domainRepo     transipdomain.Repository
 
 	productList *ProductList
+	productInfo *ProductInfo
 
 	grid *tview.Grid
 }
@@ -48,6 +49,7 @@ func NewApplication(config Config) *Application {
 
 func (a *Application) init() {
 	a.productList = &ProductList{
+		app:            a,
 		vpsRepo:        a.vpsRepo,
 		bigstorageRepo: a.bigstorageRepo,
 		domainRepo:     a.domainRepo,
@@ -56,14 +58,18 @@ func (a *Application) init() {
 
 	a.productList.init()
 
+	a.productInfo = &ProductInfo{
+		app: a,
+	}
+
+	a.productInfo.init()
+
 	a.grid = tview.NewGrid().
 		SetColumns(-1, -3).
 		SetBorders(true)
 
-	text := tview.NewTextView().SetText("LEKKER BELLEN MET HEM")
-
 	a.grid.AddItem(a.productList.treeView, 0, 0, 1, 1, 0, 0, true)
-	a.grid.AddItem(text, 0, 1, 1, 1, 0, 0, false)
+	a.grid.AddItem(a.productInfo.grid, 0, 1, 1, 1, 0, 0, false)
 }
 
 func (a *Application) Run() {

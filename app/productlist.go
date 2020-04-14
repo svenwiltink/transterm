@@ -10,6 +10,7 @@ import (
 )
 
 type ProductList struct {
+	app            *Application
 	treeView       *tview.TreeView
 	vpsRepo        transipvps.Repository
 	bigstorageRepo transipvps.BigStorageRepository
@@ -18,7 +19,6 @@ type ProductList struct {
 }
 
 func (pl *ProductList) init() {
-
 	rootDir := "Products"
 	root := tview.NewTreeNode(rootDir).
 		SetColor(tcell.ColorRed)
@@ -70,7 +70,8 @@ func (pl *ProductList) init() {
 			node := tview.NewTreeNode(fmt.Sprintf("%s (%s)", v.Name, v.Description)).
 				SetReference(v.Name).
 				SetSelectable(true).
-				SetColor(tcell.ColorGreen)
+				SetColor(tcell.ColorGreen).
+				SetSelectedFunc(pl.app.productInfo.ShowVpsFunc(v.Name))
 			vps.AddChild(node)
 		}
 	})
