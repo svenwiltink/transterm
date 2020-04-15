@@ -1,12 +1,14 @@
 package app
 
 import (
+	"github.com/gdamore/tcell"
 	"github.com/rivo/tview"
 	"github.com/transip/gotransip/v6"
 	"github.com/transip/gotransip/v6/authenticator"
 	transipdomain "github.com/transip/gotransip/v6/domain"
 	transiphaip "github.com/transip/gotransip/v6/haip"
 	transipvps "github.com/transip/gotransip/v6/vps"
+	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -20,10 +22,13 @@ type Application struct {
 	haipRepo       transiphaip.Repository
 	domainRepo     transipdomain.Repository
 
+	Logger *zap.Logger
+
 	productList *ProductList
 	productInfo *ProductInfo
 
-	grid *tview.Grid
+	grid     *tview.Grid
+	tviewApp *tview.Application
 }
 
 func NewApplication(config Config) *Application {
@@ -48,6 +53,14 @@ func NewApplication(config Config) *Application {
 }
 
 func (a *Application) init() {
+
+	var err error
+	a.Logger, err = NewLogger()
+
+	if err != nil {
+		panic(err)
+	}
+
 	a.productList = &ProductList{
 		app:            a,
 		vpsRepo:        a.vpsRepo,
@@ -69,12 +82,31 @@ func (a *Application) init() {
 		SetBorders(true)
 
 	a.grid.AddItem(a.productList.treeView, 0, 0, 1, 1, 0, 0, true)
-	a.grid.AddItem(a.productInfo.grid, 0, 1, 1, 1, 0, 0, false)
+	a.grid.AddItem(a.productInfo.grid, 0, 1, 1, 1, 0, 0, true)
 }
 
 func (a *Application) Run() {
 	a.init()
-	if err := tview.NewApplication().SetRoot(a.grid, true).EnableMouse(true).Run(); err != nil {
+	a.tviewApp = tview.NewApplication()
+
+	a.tviewApp.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		a.Logger.Debug("received input")
+		return event
+	})
+	if err := a.tviewApp.SetRoot(a.grid, true).EnableMouse(false).Run(); err != nil {
 		panic(err)
 	}
+}
+
+func NewLogger() (*zap.Logger, error){
+	cfg := zap.NewDevelopmentConfig()
+	cfg.OutputPaths = []string{
+		"transterm.log",
+	}
+
+	cfg.ErrorOutputPaths = []string{
+		"transterm.log",
+	}
+
+	return cfg.Build()
 }
