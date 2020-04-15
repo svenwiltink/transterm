@@ -1,7 +1,6 @@
 package app
 
 import (
-	"github.com/gdamore/tcell"
 	"github.com/rivo/tview"
 	"github.com/transip/gotransip/v6"
 	"github.com/transip/gotransip/v6/authenticator"
@@ -88,11 +87,6 @@ func (a *Application) init() {
 func (a *Application) Run() {
 	a.init()
 	a.tviewApp = tview.NewApplication()
-
-	a.tviewApp.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		a.Logger.Debug("received input")
-		return event
-	})
 	if err := a.tviewApp.SetRoot(a.grid, true).EnableMouse(false).Run(); err != nil {
 		panic(err)
 	}

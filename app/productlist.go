@@ -33,6 +33,8 @@ func (pl *ProductList) init() {
 		SetRoot(root).
 		SetCurrentNode(root)
 
+	pl.treeView.SetBorder(true)
+
 	vps := tview.NewTreeNode("Vps").
 		SetReference("Vps").
 		SetSelectable(true).
