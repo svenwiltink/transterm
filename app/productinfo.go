@@ -47,7 +47,6 @@ type VpsInfo struct {
 func (v *VpsInfo) ShowVps(grid *tview.Grid, vpsName string) {
 	grid.Clear()
 
-	grid.SetColumns(50, -1)
 	grid.SetMinSize(20, 0)
 
 	v.app.Logger.Debug("fetching vps", zap.String("name", vpsName))
@@ -66,16 +65,16 @@ func (v *VpsInfo) ShowVps(grid *tview.Grid, vpsName string) {
 	v.createOverview(vps)
 
 	// vertical layout first
-	grid.AddItem(v.overview, 0, 0, 1, 2, 0, 0, true)
-	grid.AddItem(v.backups, 1, 0, 1, 2, 0, 0, true)
-	grid.AddItem(v.snapshots, 2, 0, 1, 2, 0, 0, true)
-	grid.AddItem(v.network, 3, 0, 1, 2, 0, 0, true)
+	grid.AddItem(v.overview, 0, 0, 1, 1, 0, 0, true)
+	grid.AddItem(v.backups, 1, 0, 1, 1, 0, 0, true)
+	grid.AddItem(v.snapshots, 2, 0, 1, 1, 0, 0, true)
+	grid.AddItem(v.network, 3, 0, 1, 3, 0, 0, true)
 
 	// horizontal after 100 px
 	grid.AddItem(v.overview, 0, 0, 1, 1, 0, 100, true)
-	grid.AddItem(v.backups, 1, 0, 1, 1, 0, 100, true)
-	grid.AddItem(v.snapshots, 2, 0, 1, 1, 0, 100, true)
-	grid.AddItem(v.network, 0, 1, 3, 1, 0, 100, true)
+	grid.AddItem(v.backups, 0, 1, 1, 1, 0, 100, true)
+	grid.AddItem(v.snapshots, 0, 2, 1, 1, 0, 100, true)
+	grid.AddItem(v.network, 1, 0, 1, 3, 0, 100, true)
 }
 
 func (v *VpsInfo) createNetwork(vpsName string) {
