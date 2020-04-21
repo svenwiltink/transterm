@@ -12,8 +12,8 @@ import (
 )
 
 type ProductList struct {
-	app            *Application
-	treeView       *tview.TreeView
+	app      *Application
+	treeView *tview.TreeView
 
 	vpsRepo        transipvps.Repository
 	bigstorageRepo transipvps.BigStorageRepository

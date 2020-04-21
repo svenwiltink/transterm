@@ -92,7 +92,7 @@ func (a *Application) Run() {
 	}
 }
 
-func NewLogger() (*zap.Logger, error){
+func NewLogger() (*zap.Logger, error) {
 	cfg := zap.NewDevelopmentConfig()
 	cfg.OutputPaths = []string{
 		"transterm.log",

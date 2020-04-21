@@ -10,7 +10,6 @@ import (
 	"time"
 )
 
-
 type Focuser interface {
 	Focus()
 }
@@ -38,15 +37,18 @@ func (pi *ProductInfo) ShowVpsFunc(vpsName string) func() {
 }
 
 type VpsInfo struct {
-	app *Application
-	overview *tview.Table
-	network *tview.Table
+	app       *Application
+	overview  *tview.Table
+	network   *tview.Table
+	backups   *tview.Table
+	snapshots *tview.Table
 }
 
 func (v *VpsInfo) ShowVps(grid *tview.Grid, vpsName string) {
 	grid.Clear()
 
 	grid.SetColumns(50, -1)
+	grid.SetMinSize(20, 0)
 
 	v.app.Logger.Debug("fetching vps", zap.String("name", vpsName))
 	now := time.Now()
@@ -58,16 +60,22 @@ func (v *VpsInfo) ShowVps(grid *tview.Grid, vpsName string) {
 
 	v.app.Logger.Debug("done fetching vps", zap.String("name", vpsName), zap.Duration("duration", time.Since(now)))
 
-	v.createOverview(vps)
 	v.createNetwork(vpsName)
+	v.createSnapshots(vpsName)
+	v.createBackups(vpsName)
+	v.createOverview(vps)
 
 	// vertical layout first
 	grid.AddItem(v.overview, 0, 0, 1, 2, 0, 0, true)
-	grid.AddItem(v.network, 1, 0, 1, 2, 0, 0, true)
+	grid.AddItem(v.backups, 1, 0, 1, 2, 0, 0, true)
+	grid.AddItem(v.snapshots, 2, 0, 1, 2, 0, 0, true)
+	grid.AddItem(v.network, 3, 0, 1, 2, 0, 0, true)
 
 	// horizontal after 100 px
 	grid.AddItem(v.overview, 0, 0, 1, 1, 0, 100, true)
-	grid.AddItem(v.network, 0, 1, 1, 1, 0, 100, true)
+	grid.AddItem(v.backups, 1, 0, 1, 1, 0, 100, true)
+	grid.AddItem(v.snapshots, 2, 0, 1, 1, 0, 100, true)
+	grid.AddItem(v.network, 0, 1, 3, 1, 0, 100, true)
 }
 
 func (v *VpsInfo) createNetwork(vpsName string) {
@@ -97,17 +105,7 @@ func (v *VpsInfo) createNetwork(vpsName string) {
 		v.network.SetCellSimple(i+1, 3, ip.ReverseDNS)
 	}
 
-	v.network.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		v.app.Logger.Debug("key pressed", zap.String("widget", "vps network"), zap.Int32("rune", event.Rune()), zap.Int16("key", int16(event.Key())))
-
-		switch event.Key() {
-		case tcell.KeyTAB:
-			v.app.Logger.Debug("detected TAB press", zap.String("widget", "vps network"))
-			v.app.Logger.Debug("changing focus to ProductList")
-			v.app.tviewApp.SetFocus(v.app.productList.treeView)
-		}
-		return event
-	})
+	v.network.SetInputCapture(v.nextInputHandler("ip data", v.app.productList.treeView))
 }
 
 func (v *VpsInfo) createOverview(vps transipvps.Vps) {
@@ -135,17 +133,81 @@ func (v *VpsInfo) createOverview(vps transipvps.Vps) {
 	v.overview.SetCellSimple(6, 0, "Memory").
 		SetCellSimple(6, 1, fmt.Sprintf("%dG", vps.MemorySize/1024/1024))
 
-	v.overview.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		v.app.Logger.Debug("key pressed", zap.String("widget", "vps overview"), zap.Int32("rune", event.Rune()), zap.Int16("key", int16(event.Key())))
+	v.overview.SetInputCapture(v.nextInputHandler("overview", v.backups))
+}
+
+func (v *VpsInfo) createBackups(vpsName string) {
+	v.backups = tview.NewTable().SetSelectable(false, false)
+	v.backups.SetTitle("Backups").SetBorder(true)
+
+	v.backups.SetCellSimple(0, 0, "Date").
+		SetCellSimple(0, 1, "Zone").
+		SetCellSimple(0, 2, "Size").
+		SetCellSimple(0, 3, "Status")
+
+	v.app.Logger.Debug("fetching backup data", zap.String("name", vpsName))
+	start := time.Now()
+	backups, err := v.app.vpsRepo.GetBackups(vpsName)
+	if err != nil {
+		v.app.Logger.Error("error fetching backup data", zap.String("name", vpsName), zap.Error(err), zap.Duration("duration", time.Since(start)))
+		panic(err)
+	}
+
+	v.app.Logger.Debug("done fetching backup data", zap.String("name", vpsName), zap.Duration("duration", time.Since(start)))
+
+	for i, b := range backups {
+		v.backups.
+			SetCellSimple(i+1, 0, b.DateTimeCreate.In(time.Local).Format("Jan 02 15:04:05")).
+			SetCellSimple(i+1, 1, b.AvailabilityZone).
+			SetCellSimple(i+1, 2, fmt.Sprintf("%dG", b.DiskSize/1024/1024)).
+			SetCellSimple(i+1, 3, string(b.Status))
+	}
+
+	v.backups.SetInputCapture(v.nextInputHandler("vps backups", v.snapshots))
+}
+
+func (v *VpsInfo) createSnapshots(vpsName string) {
+	v.snapshots = tview.NewTable().SetSelectable(false, false)
+	v.snapshots.SetTitle("Snapshots").SetBorder(true)
+
+	v.snapshots.SetCellSimple(0, 0, "Date").
+		SetCellSimple(0, 1, "Description").
+		SetCellSimple(0, 2, "Size").
+		SetCellSimple(0, 3, "Status")
+
+	v.app.Logger.Debug("fetching snapshot data", zap.String("name", vpsName))
+	start := time.Now()
+	snapshots, err := v.app.vpsRepo.GetSnapshots(vpsName)
+	if err != nil {
+		v.app.Logger.Error("error fetching snapshot data", zap.String("name", vpsName), zap.Error(err), zap.Duration("duration", time.Since(start)))
+		panic(err)
+	}
+
+	v.app.Logger.Debug("done fetching snapshot data", zap.String("name", vpsName), zap.Duration("duration", time.Since(start)))
+
+	for i, s := range snapshots {
+		v.snapshots.
+			SetCellSimple(i+1, 0, s.DateTimeCreate.In(time.Local).Format("Jan 02 15:04:05")).
+			SetCellSimple(i+1, 1, s.Description).
+			SetCellSimple(i+1, 2, fmt.Sprintf("%dG", s.DiskSize/1024/1024)).
+			SetCellSimple(i+1, 3, string(s.Status))
+	}
+
+	v.snapshots.SetInputCapture(v.nextInputHandler("vps snapshots", v.network))
+}
+
+func (v *VpsInfo) nextInputHandler(widgetName string, next tview.Primitive) func(event *tcell.EventKey) *tcell.EventKey {
+	return func(event *tcell.EventKey) *tcell.EventKey {
+		v.app.Logger.Debug("key pressed", zap.String("widget", widgetName), zap.Int32("rune", event.Rune()), zap.Int16("key", int16(event.Key())))
 
 		switch event.Key() {
 		case tcell.KeyTAB:
-			v.app.Logger.Debug("detected TAB press", zap.String("widget", "vps overview"))
-			v.app.Logger.Debug("changing focus to network")
-			v.app.tviewApp.SetFocus(v.network)
+			v.app.Logger.Debug("detected TAB press", zap.String("widget", widgetName))
+			v.app.Logger.Debug("changing focus")
+			v.app.tviewApp.SetFocus(next)
 		}
 		return event
-	})
+	}
 }
 
 func (v *VpsInfo) Focus() {
