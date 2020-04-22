@@ -20,6 +20,7 @@ type Application struct {
 	bigstorageRepo transipvps.BigStorageRepository
 	haipRepo       transiphaip.Repository
 	domainRepo     transipdomain.Repository
+	firewallRepo   transipvps.FirewallRepository
 
 	Logger *zap.Logger
 
@@ -48,6 +49,7 @@ func NewApplication(config Config) *Application {
 		bigstorageRepo: transipvps.BigStorageRepository{Client: client},
 		haipRepo:       transiphaip.Repository{Client: client},
 		domainRepo:     transipdomain.Repository{Client: client},
+		firewallRepo:   transipvps.FirewallRepository{Client: client},
 	}
 }
 

@@ -40,6 +40,7 @@ type VpsInfo struct {
 	app       *Application
 	overview  *tview.Table
 	network   *tview.Table
+	firewall  *tview.Table
 	backups   *tview.Table
 	snapshots *tview.Table
 }
@@ -60,6 +61,7 @@ func (v *VpsInfo) ShowVps(grid *tview.Grid, vpsName string) {
 	v.app.Logger.Debug("done fetching vps", zap.String("name", vpsName), zap.Duration("duration", time.Since(now)))
 
 	v.createNetwork(vpsName)
+	v.createFirewall(vpsName)
 	v.createSnapshots(vpsName)
 	v.createBackups(vpsName)
 	v.createOverview(vps)
@@ -68,13 +70,15 @@ func (v *VpsInfo) ShowVps(grid *tview.Grid, vpsName string) {
 	grid.AddItem(v.overview, 0, 0, 1, 1, 0, 0, true)
 	grid.AddItem(v.backups, 1, 0, 1, 1, 0, 0, true)
 	grid.AddItem(v.snapshots, 2, 0, 1, 1, 0, 0, true)
-	grid.AddItem(v.network, 3, 0, 1, 3, 0, 0, true)
+	grid.AddItem(v.firewall, 3, 0, 1, 1, 0, 0, true)
+	grid.AddItem(v.network, 4, 0, 1, 1, 0, 0, true)
 
 	// horizontal after 100 px
 	grid.AddItem(v.overview, 0, 0, 1, 1, 0, 100, true)
 	grid.AddItem(v.backups, 0, 1, 1, 1, 0, 100, true)
 	grid.AddItem(v.snapshots, 0, 2, 1, 1, 0, 100, true)
-	grid.AddItem(v.network, 1, 0, 1, 3, 0, 100, true)
+	grid.AddItem(v.firewall, 1, 0, 1, 1, 0, 100, true)
+	grid.AddItem(v.network, 1, 1, 1, 2, 0, 100, true)
 }
 
 func (v *VpsInfo) createNetwork(vpsName string) {
@@ -105,6 +109,47 @@ func (v *VpsInfo) createNetwork(vpsName string) {
 	}
 
 	v.network.SetInputCapture(v.nextInputHandler("ip data", v.app.productList.treeView))
+}
+
+func (v *VpsInfo) createFirewall(vpsName string) {
+	v.firewall = tview.NewTable().SetSelectable(false, false)
+
+	v.firewall.SetCellSimple(0, 0, "Description").
+		SetCellSimple(0, 1, "Start port").
+		SetCellSimple(0, 2, "End port").
+		SetCellSimple(0, 3, "Protocol").
+		SetCellSimple(0, 4, "Whitelist")
+
+	v.app.Logger.Debug("fetching firewallRepo data", zap.String("name", vpsName))
+	now := time.Now()
+	firewall, err := v.app.firewallRepo.GetFirewall(vpsName)
+	if err != nil {
+		v.app.Logger.Error("error fetching firewallRepo data", zap.Error(err), zap.String("name", vpsName), zap.Duration("duration", time.Since(now)))
+		panic(err)
+	}
+
+	v.app.Logger.Debug("done fetching firewallRepo data", zap.String("name", vpsName), zap.Duration("duration", time.Since(now)))
+
+	enabledString := "Disabled"
+	if firewall.IsEnabled {
+		enabledString = "Enabled"
+	}
+
+	v.firewall.SetTitle(fmt.Sprintf("Firewall (%s)", enabledString)).SetBorder(true)
+
+	index := 1
+	for _, rule := range firewall.RuleSet {
+		v.firewall.SetCellSimple(index, 0, rule.Description)
+		v.firewall.SetCellSimple(index, 1, strconv.Itoa(rule.StartPort))
+		v.firewall.SetCellSimple(index, 2, strconv.Itoa(rule.EndPort))
+		v.firewall.SetCellSimple(index, 3, rule.Protocol)
+		for _, w := range rule.Whitelist {
+			v.firewall.SetCellSimple(index, 4, w.String())
+			index++
+		}
+	}
+
+	v.firewall.SetInputCapture(v.nextInputHandler("firewall", v.network))
 }
 
 func (v *VpsInfo) createOverview(vps transipvps.Vps) {
@@ -186,13 +231,13 @@ func (v *VpsInfo) createSnapshots(vpsName string) {
 
 	for i, s := range snapshots {
 		v.snapshots.
-			SetCellSimple(i+1, 0, s.DateTimeCreate.In(time.Local).Format("Jan 02 15:04:05")).
+			SetCellSimple(i+1, 0, s.DateTimeCreate).
 			SetCellSimple(i+1, 1, s.Description).
 			SetCellSimple(i+1, 2, fmt.Sprintf("%dG", s.DiskSize/1024/1024)).
 			SetCellSimple(i+1, 3, string(s.Status))
 	}
 
-	v.snapshots.SetInputCapture(v.nextInputHandler("vps snapshots", v.network))
+	v.snapshots.SetInputCapture(v.nextInputHandler("vps snapshots", v.firewall))
 }
 
 func (v *VpsInfo) nextInputHandler(widgetName string, next tview.Primitive) func(event *tcell.EventKey) *tcell.EventKey {
